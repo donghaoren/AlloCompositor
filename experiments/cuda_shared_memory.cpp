@@ -9,6 +9,7 @@
 #include <string.h>
 #include "cuda_shared_memory.h"
 #include <map>
+#include <chrono>
 #include <GL/gl.h>
 
 enum class MessageType {
@@ -107,7 +108,8 @@ public:
     }
 
     void submit() {
-        std::cout << "submit begin" << std::endl;
+        auto start = std::chrono::high_resolution_clock::now();
+
         cudaGraphicsMapResources(1, &resource_, nullptr);
         cudaArray_t array;
         cudaGraphicsSubResourceGetMappedArray(&array, resource_, 0, 0);
@@ -121,6 +123,9 @@ public:
         msg.server_side_id = server_side_id_;
         send_message(socket_, msg);
         recv_message(socket_);
+
+        auto finish = std::chrono::high_resolution_clock::now();
+        std::cout << "Submit took " << std::chrono::duration_cast<std::chrono::nanoseconds>(finish-start).count() << "ns\n";
     }
 
     unsigned int getOpenGLTexture() {
