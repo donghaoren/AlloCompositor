@@ -1,7 +1,9 @@
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
-#include <GL/glx.h>
-#include <GL/glxext.h>
 #include <iostream>
+#include <zmq.h>
+
+#include "cuda_shared_memory.h"
 
 int main(void)
 {
@@ -21,18 +23,37 @@ int main(void)
 
     /* Make the window's context current */
     glfwMakeContextCurrent(window);
+    glewInit();
 
-    PFNGLXGETCONTEXTIDEXTPROC glXGetContextIDEXT = (PFNGLXGETCONTEXTIDEXTPROC)glXGetProcAddress((const GLubyte*)"glXGetContextIDEXT");
+    void* zmq_context = zmq_ctx_new();
+    std::cout << "Request sending..." << std::endl;
+    CUDASharedTextureClient client(zmq_context, "tcp://127.0.0.1:5930", 1024, 1024);
 
-    GLXContext ctx = glXGetCurrentContext();
-    GLXContextID ctxid = glXGetContextIDEXT(ctx);
-    std::cout << "Context ID is: " << ctxid << std::endl;
+    std::cout << "Request sent" << std::endl;
+
+    GLuint framebuffer = 0;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, client.getOpenGLTexture(), 0);
 
     /* Loop until the user closes the window */
     while (!glfwWindowShouldClose(window))
     {
         /* Render here */
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
         glClear(GL_COLOR_BUFFER_BIT);
+        glBegin(GL_QUADS);
+        glColor3f(0, 1, 0);
+        glVertex3f(-0.5, -0.5, 0);
+        glVertex3f(-0.5, +0.5, 0);
+        glVertex3f(+0.5, +0.5, 0);
+        glVertex3f(+0.5, -0.5, 0);
+        glEnd();
+
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        client.submit();
 
         /* Swap front and back buffers */
         glfwSwapBuffers(window);
